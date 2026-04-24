@@ -1,0 +1,10 @@
+project: example-agent
+instance: http://localhost:8000
+agent:
+  entrypoint: agent:run_agent
+  version: "example-v1"
+suites:
+  - default
+graders:
+  llm_judge:
+    model: claude-haiku-4-5-20251001

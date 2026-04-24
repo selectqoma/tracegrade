@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run ruff check apps/api/src
+      - run: uv run ruff check apps/worker/src
+      - run: uv run ruff check packages/cli/src
+      - run: uv run ruff check packages/graders/src
+
+  test-api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: tracegrade_test
+          POSTGRES_USER: tracegrade
+          POSTGRES_PASSWORD: tracegrade
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tracegrade"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: |
+          cd apps/api
+          uv pip install --system ".[dev]"
+          pytest tests/ -v
+
+  lint-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          cd apps/web
+          npm ci
+          npm run lint
+
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          cd apps/web
+          npm ci
+          npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [lint-api, test-api, build-web]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose build

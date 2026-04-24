@@ -1,0 +1,104 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: tracegrade
+      POSTGRES_USER: tracegrade
+      POSTGRES_PASSWORD: tracegrade
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracegrade"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.3
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ./migrations/clickhouse:/docker-entrypoint-initdb.d
+    environment:
+      CLICKHOUSE_DB: tracegrade
+      CLICKHOUSE_USER: tracegrade
+      CLICKHOUSE_PASSWORD: tracegrade
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tracegrade:tracegrade@postgres:5432/tracegrade
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: tracegrade
+      CLICKHOUSE_PASSWORD: tracegrade
+      CLICKHOUSE_DB: tracegrade
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tracegrade:tracegrade@postgres:5432/tracegrade
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: tracegrade
+      CLICKHOUSE_PASSWORD: tracegrade
+      CLICKHOUSE_DB: tracegrade
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      API_URL: http://api:8000
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: dev-secret-change-in-production
+    depends_on:
+      - api
+
+volumes:
+  pg_data:
+  ch_data:
+  redis_data:

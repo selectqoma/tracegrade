@@ -1,0 +1,40 @@
+name: "TraceGrade Eval"
+description: "Run TraceGrade evals in CI and report regressions"
+
+inputs:
+  instance:
+    description: "TraceGrade instance URL"
+    required: true
+  api_key:
+    description: "TraceGrade API key"
+    required: true
+  suite:
+    description: "Eval suite to run"
+    default: "default"
+  baseline:
+    description: "Baseline branch to compare against"
+    default: "main"
+  fail_on:
+    description: "When to fail: regression | any_fail | pass"
+    default: "regression"
+
+runs:
+  using: composite
+  steps:
+    - name: Install TraceGrade CLI
+      shell: bash
+      run: pip install tracegrade
+
+    - name: Login
+      shell: bash
+      run: |
+        mkdir -p ~/.tracegrade
+        echo '{"instance": "${{ inputs.instance }}", "api_key": "${{ inputs.api_key }}"}' > ~/.tracegrade/config.json
+
+    - name: Run evals
+      shell: bash
+      run: |
+        tracegrade eval run --suite "${{ inputs.suite }}" --wait
+      env:
+        TRACEGRADE_URL: ${{ inputs.instance }}
+        TRACEGRADE_API_KEY: ${{ inputs.api_key }}

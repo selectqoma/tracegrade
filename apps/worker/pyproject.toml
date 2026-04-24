@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tracegrade-worker"
+version = "0.1.0"
+description = "TraceGrade eval synthesis and grading workers"
+requires-python = ">=3.13"
+dependencies = [
+    "arq>=0.26",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "clickhouse-connect>=0.8",
+    "anthropic>=0.42",
+    "openai>=1.60",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "redis>=5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tracegrade_worker"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
